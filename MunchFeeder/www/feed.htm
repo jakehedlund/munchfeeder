@@ -1,0 +1,214 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Content-type" content="text/html; charset=utf-8">
+    <title>Feed the Munch</title>
+    <style>
+        html * {
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        div.feedtime {
+            display: block;
+            border: 1px solid rgb(68,68,68);
+            padding: 5px;
+            width: 100%;
+            max-width: 500px;
+            background-color: rgb(238,238,238);
+        }
+
+        body {
+            width: 90%;
+            max-width: 500px;
+            margin: auto;
+        }
+
+        input[type="number"] {
+            width: 60px;
+        }
+    </style>
+    <script type="text/javascript">
+        var savedTimes = "";
+
+        function onBodyLoad() {
+            createList();
+            getTime();
+        }
+
+        function createList() {
+            var times = document.getElementById("times");
+            times.innerHTML = "";
+
+            var xh = new XMLHttpRequest();
+            xh.onreadystatechange = function () {
+                if (xh.readyState == 4) {
+                    if (xh.status == 200) {
+                        var res = JSON.parse(xh.responseText);
+                        savedTimes = res;
+                        var i = 1;
+                        for (t in res.times) {
+                            var obj = res.times[t];
+                            times.innerHTML +=
+                              '<div id="time-input' + i + '" class="feedtime">' +
+                                '<span>Time ' + i + ': </span>' +
+                                '<input id="en' + i + '"type="checkbox" name="enable' + i + '" value="Enable"' + (obj.enabled ? "checked" : "") + '> Enable - Time: </input>' +
+                                '<input id="time' + i + '" type="time" name="time' + i + '" value="' + obj.time + '" > Amount: </input>' +
+                                '<input id="amount' + i + '" type="number" name="amount' + i + '" value="' + obj.amount + '" style="width:50px" min="0"/>' +
+                            '</div>';
+                            i++;
+                        }
+                    }
+                }
+            };
+            xh.open("GET", "/times", true);
+            xh.send(null);
+
+            getLastFed();
+        }
+
+		// Get last fed time and other settings.
+        function getLastFed() {
+            var xh = new XMLHttpRequest();
+            xh.onreadystatechange = function () {
+                if (xh.readyState == 4 && xh.status == 200) {
+                    var res = JSON.parse(xh.responseText);
+                    var spd = res["rotation-speed"];
+                    //var d = new Date(res["feed-time"]);
+                    document.getElementById("last-fed").value = res["feed-time"]; 
+                    document.getElementById("feed-amount").value = res["feed-amount"];
+					document.getElementById("rotateSpeed").value = (spd == undefined ? 301 : spd); 
+					
+					var dir = res["rotation-dir"];
+					if(dir == 1)
+					{
+					  document.getElementById("radioRev").checked = true;
+					  document.getElementById("radioFwd").checked = false;
+					}
+					else
+					{
+					  document.getElementById("radioRev").checked = false;
+					  document.getElementById("radioFwd").checked = true;
+					}
+                }
+            };
+            xh.open("GET", "/lastfed.json", true);
+            xh.send(null);
+        }
+
+        function feedNow() {
+            var amt = document.getElementById("feed-amount").value;
+			
+			var conf = confirm("Feeding "+ amt +" units now. Press OK to proceed.");
+			if(!conf) return;
+
+            var xh = new XMLHttpRequest();
+            xh.open("GET", "/feednow?amount=" + amt, true);
+            xh.send();
+        }
+
+        function sendRotate() {
+            var rotAmt = document.getElementById("rotateAmt").value;
+
+            var xh = new XMLHttpRequest();
+            xh.open("GET", "/rotate?amount=" + rotAmt, true);
+            xh.send();
+        }
+		
+		function saveSettings() {
+		    var spd = document.getElementById("rotateSpeed").value;
+			var dir = document.getElementById("radioFwd").checked;
+			
+		    var xh = new XMLHttpRequest(); 
+			xh.open("GET", "/saveSettings?speed=" + spd + "&dir=" + (dir ? "0" : "1"));
+			xh.send();
+		}
+
+		function syncTime() {
+		    var time = Date();
+		    var xh = new XMLHttpRequest();
+		    xh.open("GET", "/syncTime?time=" + time);
+		    xh.send();
+		}
+
+		function syncTimeNtp() {
+            
+		}
+
+		function getTime() {
+		    var xh = new XMLHttpRequest();
+		    xh.open("GET", "/currentTime");
+		    xh.onreadystatechange = function () {
+		        if (xh.readyState == 4 && xh.status == 200) {
+		            var t = document.getElementById("curTime"); 
+		            var d = new Date(xh.responseText * 1000);
+                    
+		            t.textContent = d.toLocaleString();
+		        }
+		     }
+		    xh.send(); 
+		}
+
+		function unjam() {
+		    var xh = new XMLHttpRequest();
+		    xh.open("GET", "/unjam");
+		    xh.send(); 
+		}
+		
+    </script>
+</head>
+<!--<meta name="viewport" content="width=device-width, initial-scale=1.0">-->
+<body onload="onBodyLoad()">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <div id="title" class="feedtime" align="center">
+		<h2 style="text-align: center;">FEED THE MUNCH</h2>
+		<img src="munch.jpg" width="200" /></div>
+    <div id="feed-now" class="feedtime">
+        Last fed:
+        <input type="datetime-local" id="last-fed" style="width: 185px;" readonly /><br/>
+        Feed now:
+        <input type="number" id="feed-amount" style="width: 50px;" value="3" min="0" />
+        <input type="button" id="feed-button" value="Feed Now" onclick="feedNow()" />
+    </div>
+
+    <div id="time-list">
+        <form action="/update-times" method="POST">
+            <div id="times">
+            </div>
+            <div class="feedtime" style="overflow: auto">
+                <input type="hidden" name="redirect" value="/feed.htm" />
+                <input type="submit" style="float: right;" value="Save" />
+            </div>
+        </form>
+    </div>
+
+    <div class="feedtime" style="overflow:auto">
+        Manual rotate: <input type="number" id="rotateAmt" value="50" min="1" max="2000" />
+        <input type="button" id="rotateBtn" value="Submit" onclick="sendRotate()"/>
+    </div>
+	
+    <div class="feedtime" style="overflow:auto">
+        <label>Speed: <input type="number" id="rotateSpeed" value="300" min="100" max="600" /></label>
+		
+		<input type="radio" id="radioFwd" name="dir" checked="checked"/>
+		<label for="radioFwd">Forward</label>
+		
+		<input type="radio" id="radioRev" name="dir"/>
+		<label for="radioRev">Reverse</label>
+		
+        <input type="button" id="saveSettings" value="Submit" onclick="saveSettings()"/>
+		
+		
+    </div>
+
+    <div class="feedtime">
+        <button onclick="syncTime()">Sync time</button>
+        <button>Get NTP time</button>
+        <button onclick="unjam()">Un-Jam</button>
+    </div>
+
+    <div class="feedtime">
+        Current time: <span id="curTime"></span>
+    </div>
+	
+</body>
+</html>
